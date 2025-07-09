@@ -1,11 +1,11 @@
 {
-  "name": "vite-web-extension",
+  "name": "opfs-browser",
   "version": "1.4.0",
   "description": "A simple chrome & firefox extension template with Vite, React, TypeScript and Tailwind CSS.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/JohnBra/vite-web-extension.git"
+    "url": "https://github.com/jchu634/OPFS-Browser.git"
   },
   "scripts": {
     "build": "vite build --config vite.config.chrome.ts",
@@ -29,8 +29,7 @@
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.6",
     "@types/webextension-polyfill": "^0.12.3",
-    "@typescript-eslint/eslint-plugin": "^7.8.0",
-    "@typescript-eslint/parser": "^7.18.0",
+    "@typescript-eslint/eslint-plugin": "^8.36.0",
     "@vitejs/plugin-react": "^4.6.0",
     "eslint": "^9.28.0",
     "eslint-config-prettier": "^10.1.5",
