@@ -9,7 +9,8 @@
         "contentStyle.css",
         "dev-icon-128.png",
         "dev-icon-32.png",
-        "src/pages/devtools/panel.html"
+        "src/pages/devtools/panel.html",
+        "src/pages/devtools/panel.tsx"
       ],
       "matches": [
         "<all_urls>"

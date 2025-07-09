@@ -15,7 +15,8 @@
         "contentStyle.css",
         "icon-128.png",
         "icon-32.png",
-        "src/pages/devtools/panel.html"
+        "src/pages/devtools/panel.html",
+        "src/pages/devtools/panel.tsx"
       ],
       "matches": [
         "<all_urls>"
