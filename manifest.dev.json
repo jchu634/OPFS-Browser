@@ -8,9 +8,12 @@
       "resources": [
         "contentStyle.css",
         "dev-icon-128.png",
-        "dev-icon-32.png"
+        "dev-icon-32.png",
+        "src/pages/devtools/panel.html"
       ],
-      "matches": []
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }
