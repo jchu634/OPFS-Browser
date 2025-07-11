@@ -21,6 +21,11 @@
       "run_at": "document_idle"
     }
   ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "opfs-browser@keshuac.com"
+    }
+  },
   "web_accessible_resources": [
     {
       "resources": [
