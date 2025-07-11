@@ -38,15 +38,20 @@ export default function DevtoolsPage() {
         setOpfsContents(["Fetching OPFS contents via eval() to DOM..."]);
         // ...existing code...
         const getOpfsContentsAndBridgeToDOM = async () => {
-            const collectedOutput = [];
-            const listDirectoryContents = async (directoryHandle, depth) => {
+            const collectedOutput: string[] = [];
+            const listDirectoryContents = async (
+                directoryHandle: any,
+                depth: number
+            ) => {
                 depth = depth || 0;
                 if (!directoryHandle) {
-                    directoryHandle = await navigator.storage.getDirectory();
+                    directoryHandle = await (
+                        navigator.storage as any
+                    ).getDirectory();
                 }
                 try {
                     const entries = await directoryHandle.values();
-                    for await (const entry of entries) {
+                    for await (const entry of entries as any) {
                         const indentation = "    ".repeat(depth);
                         if (entry.kind === "directory") {
                             collectedOutput.push(
@@ -54,7 +59,7 @@ export default function DevtoolsPage() {
                             );
                             await listDirectoryContents(entry, depth + 1);
                         } else {
-                            let size = null;
+                            let size: string | null = null;
                             try {
                                 const file = await entry.getFile();
                                 size = (file.size / 1024).toFixed(2) + " KB";
@@ -66,7 +71,7 @@ export default function DevtoolsPage() {
                             );
                         }
                     }
-                } catch (error) {
+                } catch (error: any) {
                     collectedOutput.push(
                         `Error: OPFS listing failed at ${
                             directoryHandle.name || "root"
@@ -75,19 +80,21 @@ export default function DevtoolsPage() {
                     throw error;
                 }
             };
-            let resultStatus = "success";
+            let resultStatus: StatusType = "success";
             let resultMessage = "Successfully retrieved OPFS contents.";
             try {
                 await listDirectoryContents(null, 0);
-            } catch (error) {
+            } catch (error: any) {
                 resultStatus = "error";
                 resultMessage = `OPFS access/listing failed: ${error.message}`;
             }
             let dataElement = document.getElementById("opfs-debug-data");
             if (!dataElement) {
-                dataElement = document.createElement("script");
+                dataElement = document.createElement(
+                    "script"
+                ) as HTMLScriptElement;
                 dataElement.id = "opfs-debug-data";
-                dataElement.type = "application/json";
+                (dataElement as HTMLScriptElement).type = "application/json";
                 document.head.appendChild(dataElement);
             }
             dataElement.textContent = JSON.stringify({
@@ -100,10 +107,11 @@ export default function DevtoolsPage() {
         };
         try {
             // @ts-ignore browser global
-            const [evalConfirmation, isException] =
-                await browser.devtools.inspectedWindow.eval(
-                    `(${getOpfsContentsAndBridgeToDOM.toString()})()`
-                );
+            const [evalConfirmation, isException]: [any, boolean] = await (
+                browser as any
+            ).devtools.inspectedWindow.eval(
+                `(${getOpfsContentsAndBridgeToDOM.toString()})()`
+            );
             if (isException) {
                 setStatus({
                     message:
@@ -138,11 +146,13 @@ export default function DevtoolsPage() {
             message: `Attempting to download '${downloadPath}'...`,
             type: "info",
         });
-        const downloadFileFromPage = async (path) => {
+        const downloadFileFromPage = async (path: string) => {
             try {
                 const parts = path.split("/");
-                let currentHandle = await navigator.storage.getDirectory();
-                let fileHandle;
+                let currentHandle: any = await (
+                    navigator.storage as any
+                ).getDirectory();
+                let fileHandle: any;
                 for (let i = 0; i < parts.length; i++) {
                     if (i === parts.length - 1) {
                         fileHandle = await currentHandle.getFileHandle(
@@ -165,9 +175,12 @@ export default function DevtoolsPage() {
                     "opfs-debug-download-data"
                 );
                 if (!downloadElement) {
-                    downloadElement = document.createElement("script");
+                    downloadElement = document.createElement(
+                        "script"
+                    ) as HTMLScriptElement;
                     downloadElement.id = "opfs-debug-download-data";
-                    downloadElement.type = "application/json";
+                    (downloadElement as HTMLScriptElement).type =
+                        "application/json";
                     document.head.appendChild(downloadElement);
                 }
                 downloadElement.textContent = JSON.stringify({
@@ -188,10 +201,11 @@ export default function DevtoolsPage() {
         };
         try {
             // @ts-ignore browser global
-            const [evalResult, isException] =
-                await browser.devtools.inspectedWindow.eval(
-                    `(${downloadFileFromPage.toString()})('${downloadPath}')`
-                );
+            const [evalResult, isException]: [any, boolean] = await (
+                browser as any
+            ).devtools.inspectedWindow.eval(
+                `(${downloadFileFromPage.toString()})('${downloadPath}')`
+            );
             if (isException || evalResult.status === "error") {
                 setStatus({
                     message: `Download eval failed: ${
@@ -233,7 +247,7 @@ export default function DevtoolsPage() {
             type: "info",
         });
         const reader = new FileReader();
-        reader.onload = async (e) => {
+        reader.onload = async (e: ProgressEvent<FileReader>) => {
             const fileContentArrayBuffer = e.target?.result as ArrayBuffer;
             const base64Content = btoa(
                 String.fromCharCode(...new Uint8Array(fileContentArrayBuffer))
@@ -242,10 +256,15 @@ export default function DevtoolsPage() {
                 message: `Uploading '${uploadFile.name}' to '${uploadPath}'...`,
                 type: "info",
             });
-            const uploadFileToPage = async (path, contentBase64) => {
+            const uploadFileToPage = async (
+                path: string,
+                contentBase64: string
+            ) => {
                 try {
                     const parts = path.split("/");
-                    let currentHandle = await navigator.storage.getDirectory();
+                    let currentHandle: any = await (
+                        navigator.storage as any
+                    ).getDirectory();
                     let fileName = parts[parts.length - 1];
                     let directoryPath = parts.slice(0, -1);
                     for (const part of directoryPath) {
@@ -281,10 +300,11 @@ export default function DevtoolsPage() {
             };
             try {
                 // @ts-ignore browser global
-                const [evalResult, isException] =
-                    await browser.devtools.inspectedWindow.eval(
-                        `(${uploadFileToPage.toString()})('${uploadPath}', '${base64Content}')`
-                    );
+                const [evalResult, isException]: [any, boolean] = await (
+                    browser as any
+                ).devtools.inspectedWindow.eval(
+                    `(${uploadFileToPage.toString()})('${uploadPath}', '${base64Content}')`
+                );
                 if (isException || evalResult.status === "error") {
                     setStatus({
                         message: `Upload failed: ${
@@ -327,12 +347,17 @@ export default function DevtoolsPage() {
             message: `Attempting to delete '${deletePath}' (recursive: ${deleteRecursive})...`,
             type: "info",
         });
-        const deleteEntryFromPage = async (path, recursiveOption) => {
+        const deleteEntryFromPage = async (
+            path: string,
+            recursiveOption: boolean
+        ) => {
             try {
                 const parts = path.split("/");
-                let currentHandle = await navigator.storage.getDirectory();
-                let parentHandle;
-                let entryName;
+                let currentHandle: any = await (
+                    navigator.storage as any
+                ).getDirectory();
+                let parentHandle: any;
+                let entryName: string;
                 if (parts.length === 1) {
                     parentHandle = currentHandle;
                     entryName = parts[0];
@@ -361,10 +386,11 @@ export default function DevtoolsPage() {
         };
         try {
             // @ts-ignore browser global
-            const [evalResult, isException] =
-                await browser.devtools.inspectedWindow.eval(
-                    `(${deleteEntryFromPage.toString()})('${deletePath}', ${deleteRecursive})`
-                );
+            const [evalResult, isException]: [any, boolean] = await (
+                browser as any
+            ).devtools.inspectedWindow.eval(
+                `(${deleteEntryFromPage.toString()})('${deletePath}', ${deleteRecursive})`
+            );
             if (isException || evalResult.status === "error") {
                 setStatus({
                     message: `Delete failed: ${
@@ -389,11 +415,11 @@ export default function DevtoolsPage() {
     // --- Listen for browser.runtime messages ---
     useEffect(() => {
         // @ts-ignore browser global
-        const runtime = browser?.runtime;
+        const runtime = (browser as any)?.runtime;
         if (!runtime) return;
-        const listener = (message) => {
+        const listener = (message: any) => {
             // @ts-ignore browser global
-            const tabId = browser.devtools.inspectedWindow.tabId;
+            const tabId = (browser as any).devtools.inspectedWindow.tabId;
             if (
                 message.type === "OPFS_OPERATION_STATUS" &&
                 message.tabId === tabId
