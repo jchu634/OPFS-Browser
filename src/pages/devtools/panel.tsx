@@ -32,19 +32,7 @@ export default function DevtoolsPage() {
             type: "info",
         }
     );
-    const [uploadStatus, setUploadStatus] = useState<{
-        message: string;
-        type: StatusType;
-    }>({
-        message: "Select a file.",
-        type: "info",
-    });
     const [opfsContents, setOpfsContents] = useState<EntryInfo[]>([]);
-    const [downloadPath, setDownloadPath] = useState("");
-    const [uploadFile, setUploadFile] = useState<File | null>(null);
-    const [uploadPath, setUploadPath] = useState("");
-    const [deletePath, setDeletePath] = useState("");
-    const [deleteRecursive, setDeleteRecursive] = useState(false);
 
     // --- OPFS Listing ---
     const loadDirectoryContents = async (path: string = "") => {
@@ -186,18 +174,19 @@ export default function DevtoolsPage() {
     };
 
     // --- Download File ---
-    const handleDownload = async () => {
-        if (!downloadPath.trim()) {
+    const handleDownload = async (filePath: string) => {
+        if (!filePath.trim()) {
             setStatus({
-                message: "Please enter a file path to download.",
+                message: "No file path provided for download.",
                 type: "error",
             });
             return;
         }
         setStatus({
-            message: `Attempting to download '${downloadPath}'...`,
+            message: `Attempting to download '${filePath}'...`,
             type: "info",
         });
+
         const downloadFileFromPage = async (path: string) => {
             try {
                 const parts = path.split("/");
@@ -205,6 +194,7 @@ export default function DevtoolsPage() {
                     navigator.storage as any
                 ).getDirectory();
                 let fileHandle: any;
+
                 for (let i = 0; i < parts.length; i++) {
                     if (i === parts.length - 1) {
                         fileHandle = await currentHandle.getFileHandle(
@@ -216,51 +206,47 @@ export default function DevtoolsPage() {
                         );
                     }
                 }
-                if (!fileHandle)
+
+                if (!fileHandle) {
                     throw new Error("File handle not found after traversal.");
+                }
+
                 const file = await fileHandle.getFile();
                 const arrayBuffer = await file.arrayBuffer();
-                const base64Content = btoa(
-                    String.fromCharCode(...new Uint8Array(arrayBuffer))
-                );
-                let downloadElement = document.getElementById(
-                    "opfs-debug-download-data"
-                );
-                if (!downloadElement) {
-                    downloadElement = document.createElement(
-                        "script"
-                    ) as HTMLScriptElement;
-                    downloadElement.id = "opfs-debug-download-data";
-                    (downloadElement as HTMLScriptElement).type =
-                        "application/json";
-                    document.head.appendChild(downloadElement);
-                }
-                downloadElement.textContent = JSON.stringify({
-                    fileName: file.name,
-                    fileContentBase64: base64Content,
-                });
-                window.dispatchEvent(new CustomEvent("OPFSDebugDownloadReady"));
+
+                // Create a download link instead of using the background script
+                const blob = new Blob([arrayBuffer]);
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = file.name;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
                 return {
                     status: "success",
-                    message: "File data sent to content script for download.",
+                    message: `File '${file.name}' downloaded successfully.`,
                 };
             } catch (error: any) {
                 return {
                     status: "error",
-                    message: `Failed to read file for download: ${error.message}`,
+                    message: `Failed to download file: ${error.message}`,
                 };
             }
         };
+
         try {
             // @ts-ignore browser global
             const [evalResult, isException]: [any, boolean] = await (
                 browser as any
             ).devtools.inspectedWindow.eval(
-                `(${downloadFileFromPage.toString()})('${downloadPath}')`
+                `(${downloadFileFromPage.toString()})('${filePath}')`
             );
             if (isException || evalResult.status === "error") {
                 setStatus({
-                    message: `Download eval failed: ${
+                    message: `Download failed: ${
                         isException
                             ? "Exception in page. See page console."
                             : evalResult.message
@@ -268,36 +254,37 @@ export default function DevtoolsPage() {
                     type: "error",
                 });
             } else {
-                setStatus({ message: evalResult.message, type: "info" });
+                setStatus({ message: evalResult.message, type: "success" });
             }
         } catch (evalError: any) {
             setStatus({
-                message: `Error initiating download eval: ${evalError.message}`,
+                message: `Error initiating download: ${evalError.message}`,
                 type: "error",
             });
         }
     };
 
     // --- Upload File ---
-    const handleUpload = async () => {
-        if (!uploadFile) {
+    const handleUpload = async (file: File, uploadPath: string) => {
+        if (!file) {
             setStatus({
-                message: "No file selected for upload.",
+                message: "No file provided for upload.",
                 type: "error",
             });
             return;
         }
         if (!uploadPath.trim()) {
             setStatus({
-                message: "Please enter a destination path for upload.",
+                message: "No upload path provided.",
                 type: "error",
             });
             return;
         }
         setStatus({
-            message: `Reading '${uploadFile.name}' for upload to '${uploadPath}'...`,
+            message: `Reading '${file.name}' for upload to '${uploadPath}'...`,
             type: "info",
         });
+
         const reader = new FileReader();
         reader.onload = async (e: ProgressEvent<FileReader>) => {
             const fileContentArrayBuffer = e.target?.result as ArrayBuffer;
@@ -305,9 +292,10 @@ export default function DevtoolsPage() {
                 String.fromCharCode(...new Uint8Array(fileContentArrayBuffer))
             );
             setStatus({
-                message: `Uploading '${uploadFile.name}' to '${uploadPath}'...`,
+                message: `Uploading '${file.name}' to '${uploadPath}'...`,
                 type: "info",
             });
+
             const uploadFileToPage = async (
                 path: string,
                 contentBase64: string
@@ -350,6 +338,7 @@ export default function DevtoolsPage() {
                     };
                 }
             };
+
             try {
                 // @ts-ignore browser global
                 const [evalResult, isException]: [any, boolean] = await (
@@ -368,29 +357,36 @@ export default function DevtoolsPage() {
                     });
                 } else {
                     setStatus({ message: evalResult.message, type: "success" });
-                    refreshOpfsContents();
+                    // Refresh the tree to show the new file
+                    setTimeout(() => {
+                        refreshOpfsContents();
+                    }, 500);
                 }
             } catch (evalError: any) {
                 setStatus({
-                    message: `Error initiating upload eval: ${evalError.message}`,
+                    message: `Error initiating upload: ${evalError.message}`,
                     type: "error",
                 });
             }
         };
+
         reader.onerror = () => {
             setStatus({
                 message: `Error reading file for upload: ${reader.error}`,
                 type: "error",
             });
         };
-        reader.readAsArrayBuffer(uploadFile);
+        reader.readAsArrayBuffer(file);
     };
 
     // --- Delete Entry ---
-    const handleDelete = async () => {
+    const handleDelete = async (
+        deletePath: string,
+        deleteRecursive: boolean
+    ) => {
         if (!deletePath.trim()) {
             setStatus({
-                message: "Please enter an entry path to delete.",
+                message: "No entry path provided for deletion.",
                 type: "error",
             });
             return;
@@ -399,6 +395,7 @@ export default function DevtoolsPage() {
             message: `Attempting to delete '${deletePath}' (recursive: ${deleteRecursive})...`,
             type: "info",
         });
+
         const deleteEntryFromPage = async (
             path: string,
             recursiveOption: boolean
@@ -436,6 +433,7 @@ export default function DevtoolsPage() {
                 };
             }
         };
+
         try {
             // @ts-ignore browser global
             const [evalResult, isException]: [any, boolean] = await (
@@ -454,11 +452,14 @@ export default function DevtoolsPage() {
                 });
             } else {
                 setStatus({ message: evalResult.message, type: "success" });
-                refreshOpfsContents();
+                // Refresh the tree to show the changes
+                setTimeout(() => {
+                    refreshOpfsContents();
+                }, 500);
             }
         } catch (evalError: any) {
             setStatus({
-                message: `Error initiating delete eval: ${evalError.message}`,
+                message: `Error initiating delete: ${evalError.message}`,
                 type: "error",
             });
         }
@@ -492,23 +493,6 @@ export default function DevtoolsPage() {
         if (!runtime) return;
         const listener = (message: any) => {
             const tabId = (browser as any).devtools.inspectedWindow.tabId;
-            if (
-                message.type === "OPFS_OPERATION_STATUS" &&
-                message.tabId === tabId
-            ) {
-                setStatus({
-                    message: message.result.message,
-                    type: message.result.status,
-                });
-                if (
-                    message.result.status === "success" &&
-                    message.result.message.includes("download initiated")
-                ) {
-                    // No need to refresh list for download
-                } else {
-                    refreshOpfsContents();
-                }
-            }
             if (
                 message.type === "OPFS_CONTENTS_RESULT_DOM_BRIDGE" &&
                 message.tabId === tabId
@@ -600,6 +584,49 @@ export default function DevtoolsPage() {
         const isDirectory = entry.kind === "directory";
         const hasChildren = entry.children && entry.children.length > 0;
 
+        const handleDownloadClick = (e: React.MouseEvent) => {
+            e.stopPropagation();
+            handleDownload(entry.path);
+        };
+
+        const handleUploadClick = (e: React.MouseEvent) => {
+            e.stopPropagation();
+            // Create a hidden file input and trigger it
+            const fileInput = document.createElement("input");
+            fileInput.type = "file";
+            fileInput.onchange = (event) => {
+                const file = (event.target as HTMLInputElement).files?.[0];
+                if (file) {
+                    let uploadPath: string;
+                    // Set upload path based on whether it's a directory or file
+                    if (isDirectory) {
+                        uploadPath = `${entry.path}/${file.name}`;
+                    } else {
+                        // For files, replace the filename with the selected file
+                        const pathParts = entry.path.split("/");
+                        pathParts[pathParts.length - 1] = file.name;
+                        uploadPath = pathParts.join("/");
+                    }
+
+                    setStatus({
+                        message: `File selected: ${file.name}. Starting upload...`,
+                        type: "info",
+                    });
+
+                    // Auto-trigger upload
+                    setTimeout(() => {
+                        handleUpload(file, uploadPath);
+                    }, 100);
+                }
+            };
+            fileInput.click();
+        };
+
+        const handleDeleteClick = (e: React.MouseEvent) => {
+            e.stopPropagation();
+            handleDelete(entry.path, isDirectory);
+        };
+
         return (
             <div style={{ marginLeft: `${depth * 20}px` }}>
                 <div
@@ -634,19 +661,31 @@ export default function DevtoolsPage() {
                     )}
                     <div className="pl-4 flex space-x-2">
                         {entry.kind === "directory" && (
-                            <div className=" bg-amber-800 rounded-lg flex p-2 text-white">
-                                <ArrowUpToLine />
-                            </div>
+                            <button
+                                className="bg-amber-800 rounded-lg flex p-2 text-white hover:bg-amber-700 transition-colors"
+                                onClick={handleUploadClick}
+                                title="Upload file to this directory"
+                            >
+                                <ArrowUpToLine size={16} />
+                            </button>
                         )}
                         {entry.kind === "file" && (
-                            <div className=" bg-blue-600 rounded-lg flex p-2 text-white">
-                                <ArrowDownToLine />
-                            </div>
+                            <button
+                                className="bg-blue-600 rounded-lg flex p-2 text-white hover:bg-blue-500 transition-colors"
+                                onClick={handleDownloadClick}
+                                title="Download this file"
+                            >
+                                <ArrowDownToLine size={16} />
+                            </button>
                         )}
 
-                        <div className=" bg-red-800 rounded-lg flex p-2 text-white">
-                            <Trash2 />
-                        </div>
+                        <button
+                            className="bg-red-800 rounded-lg flex p-2 text-white hover:bg-red-700 transition-colors"
+                            onClick={handleDeleteClick}
+                            title={`Delete this ${entry.kind}`}
+                        >
+                            <Trash2 size={16} />
+                        </button>
                     </div>
                 </div>
                 {isDirectory && entry.expanded && hasChildren && (
@@ -667,105 +706,32 @@ export default function DevtoolsPage() {
     // --- UI ---
     return (
         <div className="bg-black text-white min-h-screen p-4">
-            <h1 className="text-amber-800 text-xl font-bold mb-2">
-                Origin Private File System Browser
-            </h1>
-            <div id="controls" className="mb-4 pb-2 border-b border-gray-700">
+            <div
+                id="controls"
+                className="mb-4 pb-2 border-b border-gray-700 flex justify-between"
+            >
+                <h1 className="text-amber-800 text-xl font-bold mb-2">
+                    Origin Private File System Browser
+                </h1>
+                <div></div>
+                {/* <div
+                    id="status"
+                    className={` p-2 rounded ${
+                        status.type === "success"
+                            ? "bg-green-900 text-green-300"
+                            : status.type === "error"
+                            ? "bg-red-900 text-red-300"
+                            : "bg-blue-900 text-blue-300"
+                    }`}
+                >
+                    {status.message}
+                </div> */}
                 <button
-                    className="bg-amber-700 p-2 rounded flex"
+                    className="bg-amber-700 p-2 rounded flex space-x-2"
                     onClick={refreshOpfsContents}
                 >
+                    <p className="h-max align-middle font-bold">RESET</p>
                     <RefreshCcw />
-                </button>
-            </div>
-
-            <div className="file-operation-section border border-gray-700 p-2 mt-4 bg-gray-900">
-                <h3 className="text-lg mb-2">Download File</h3>
-                <input
-                    type="text"
-                    className="text-black px-2 py-1 mr-2"
-                    placeholder="e.g., my-data.txt or images/photo.jpg"
-                    value={downloadPath}
-                    onChange={(e) => setDownloadPath(e.target.value)}
-                    size={40}
-                />
-                <button
-                    className="bg-amber-700 px-3 py-1 rounded"
-                    onClick={handleDownload}
-                >
-                    Download
-                </button>
-            </div>
-
-            <div className="file-operation-section border border-gray-700 p-2 mt-4 bg-gray-900">
-                <h3 className="text-lg mb-2">Upload File</h3>
-                <input
-                    type="file"
-                    className="mb-2"
-                    onChange={(e) => {
-                        const file = e.target.files?.[0] || null;
-                        setUploadFile(file);
-                        setUploadStatus({
-                            message: file
-                                ? `File selected: ${file.name}`
-                                : "Select a file.",
-                            type: "info",
-                        });
-                    }}
-                />
-                <input
-                    type="text"
-                    className="text-black px-2 py-1 mr-2"
-                    placeholder="e.g., new-file.txt or uploads/doc.pdf"
-                    value={uploadPath}
-                    onChange={(e) => setUploadPath(e.target.value)}
-                    size={40}
-                />
-                <button
-                    className="bg-amber-700 px-3 py-1 rounded"
-                    onClick={handleUpload}
-                    disabled={!uploadFile}
-                >
-                    Upload
-                </button>
-                <div
-                    id="uploadStatus"
-                    className={
-                        uploadStatus.type === "success"
-                            ? "text-green-400"
-                            : uploadStatus.type === "error"
-                            ? "text-red-400"
-                            : "text-blue-400"
-                    }
-                >
-                    {uploadStatus.message}
-                </div>
-            </div>
-
-            <div className="file-operation-section border border-gray-700 p-2 mt-4 bg-gray-900">
-                <h3 className="text-lg mb-2">Delete Entry</h3>
-                <input
-                    type="text"
-                    className="text-black px-2 py-1 mr-2"
-                    placeholder="e.g., my-data.txt or images/"
-                    value={deletePath}
-                    onChange={(e) => setDeletePath(e.target.value)}
-                    size={40}
-                />
-                <label className="mr-2">
-                    <input
-                        type="checkbox"
-                        checked={deleteRecursive}
-                        onChange={(e) => setDeleteRecursive(e.target.checked)}
-                        className="mr-1"
-                    />
-                    Recursive (for directories)
-                </label>
-                <button
-                    className="bg-amber-700 px-3 py-1 rounded"
-                    onClick={handleDelete}
-                >
-                    Delete
                 </button>
             </div>
 
@@ -775,7 +741,7 @@ export default function DevtoolsPage() {
                 className="border border-gray-700 p-2 bg-gray-800 mt-2 font-mono max-h-96 overflow-y-auto"
             >
                 {opfsContents.length === 0
-                    ? 'Click "Refresh Contents" to view.'
+                    ? 'Click "RESET" to load contents.'
                     : opfsContents.map((entry, idx) => (
                           <TreeItem
                               key={`${entry.path}-${idx}`}
