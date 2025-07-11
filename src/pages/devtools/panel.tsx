@@ -9,6 +9,7 @@ import {
     Trash2,
     ArrowDownToLine,
     ArrowUpToLine,
+    Upload,
 } from "lucide-react";
 import "@assets/styles/tailwind.css";
 
@@ -381,6 +382,26 @@ export default function DevtoolsPage() {
         reader.readAsArrayBuffer(file);
     };
 
+    // --- Upload to Root ---
+    const handleUploadToRoot = () => {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.onchange = (event) => {
+            const file = (event.target as HTMLInputElement).files?.[0];
+            if (file) {
+                const uploadPath = file.name; // Root path is just the filename
+                setStatus({
+                    message: `File selected: ${file.name}. Starting upload to root...`,
+                    type: "info",
+                });
+                setTimeout(() => {
+                    handleUpload(file, uploadPath);
+                }, 100);
+            }
+        };
+        fileInput.click();
+    };
+
     // --- Delete Entry ---
     const handleDelete = async (
         deletePath: string,
@@ -737,13 +758,25 @@ export default function DevtoolsPage() {
                 >
                     {status.message}
                 </div> */}
-                <button
-                    className="bg-amber-700 p-2 rounded flex space-x-2"
-                    onClick={refreshOpfsContents}
-                >
-                    <p className="h-max align-middle font-bold">RESET</p>
-                    <RefreshCcw />
-                </button>
+                <div className="flex space-x-2">
+                    <button
+                        className="bg-green-700 p-2 rounded flex space-x-2 hover:bg-green-600 transition-colors"
+                        onClick={handleUploadToRoot}
+                        title="Upload file to root directory"
+                    >
+                        <p className="h-max align-middle font-bold">
+                            UPLOAD TO ROOT
+                        </p>
+                        <Upload />
+                    </button>
+                    <button
+                        className="bg-amber-700 p-2 rounded flex space-x-2"
+                        onClick={refreshOpfsContents}
+                    >
+                        <p className="h-max align-middle font-bold">RESET</p>
+                        <RefreshCcw />
+                    </button>
+                </div>
             </div>
 
             <h2 className="mt-6 text-lg">Contents:</h2>
