@@ -1,12 +1,7 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { RefreshCcw } from "lucide-react";
 import "@assets/styles/tailwind.css";
-
-type EntryInfo = {
-    name: string;
-    kind: "file" | "directory";
-    contents?: EntryInfo[]; // For directories, to store their contents
-};
 
 type StatusType = "success" | "error" | "info";
 
@@ -18,10 +13,6 @@ export default function DevtoolsPage() {
             type: "info",
         }
     );
-    const [opfsContents, setOpfsContents] = useState<string[]>([]);
-    const [downloadPath, setDownloadPath] = useState("");
-    const [uploadFile, setUploadFile] = useState<File | null>(null);
-    const [uploadPath, setUploadPath] = useState("");
     const [uploadStatus, setUploadStatus] = useState<{
         message: string;
         type: StatusType;
@@ -29,6 +20,10 @@ export default function DevtoolsPage() {
         message: "Select a file.",
         type: "info",
     });
+    const [opfsContents, setOpfsContents] = useState<string[]>([]);
+    const [downloadPath, setDownloadPath] = useState("");
+    const [uploadFile, setUploadFile] = useState<File | null>(null);
+    const [uploadPath, setUploadPath] = useState("");
     const [deletePath, setDeletePath] = useState("");
     const [deleteRecursive, setDeleteRecursive] = useState(false);
 
@@ -36,7 +31,8 @@ export default function DevtoolsPage() {
     const refreshOpfsContents = async () => {
         setStatus({ message: "Refreshing OPFS list...", type: "info" });
         setOpfsContents(["Fetching OPFS contents via eval() to DOM..."]);
-        // ...existing code...
+
+        // Eval() code for DOM
         const getOpfsContentsAndBridgeToDOM = async () => {
             const collectedOutput: string[] = [];
             const listDirectoryContents = async (
@@ -414,11 +410,9 @@ export default function DevtoolsPage() {
 
     // --- Listen for browser.runtime messages ---
     useEffect(() => {
-        // @ts-ignore browser global
         const runtime = (browser as any)?.runtime;
         if (!runtime) return;
         const listener = (message: any) => {
-            // @ts-ignore browser global
             const tabId = (browser as any).devtools.inspectedWindow.tabId;
             if (
                 message.type === "OPFS_OPERATION_STATUS" &&
@@ -452,6 +446,7 @@ export default function DevtoolsPage() {
                         message: "OPFS list refreshed.",
                         type: "success",
                     });
+                    console.log(result.contents);
                 } else {
                     setOpfsContents([
                         `Error from inspected page: ${result.message}`,
@@ -477,28 +472,16 @@ export default function DevtoolsPage() {
     // --- UI ---
     return (
         <div className="bg-black text-white min-h-screen p-4">
-            <h1 className="text-amber-800 text-xl mb-2">
-                Origin Private File System Viewer
+            <h1 className="text-amber-800 text-xl font-bold mb-2">
+                Origin Private File System Browser
             </h1>
             <div id="controls" className="mb-4 pb-2 border-b border-gray-700">
                 <button
-                    className="bg-amber-700 px-3 py-1 rounded mb-2 mr-2"
+                    className="bg-amber-700 p-2 rounded flex"
                     onClick={refreshOpfsContents}
                 >
-                    Refresh Contents
+                    <RefreshCcw />
                 </button>
-                <span
-                    id="statusMessage"
-                    className={
-                        status.type === "success"
-                            ? "text-green-400"
-                            : status.type === "error"
-                            ? "text-red-400"
-                            : "text-blue-400"
-                    }
-                >
-                    {status.message}
-                </span>
             </div>
 
             <div className="file-operation-section border border-gray-700 p-2 mt-4 bg-gray-900">
