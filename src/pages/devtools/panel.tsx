@@ -357,9 +357,11 @@ export default function DevtoolsPage() {
                     });
                 } else {
                     setStatus({ message: evalResult.message, type: "success" });
-                    // Refresh the tree to show the new file
+                    // Refresh only the parent directory to show the new file
+                    const pathParts = uploadPath.split("/");
+                    const parentPath = pathParts.slice(0, -1).join("/");
                     setTimeout(() => {
-                        refreshOpfsContents();
+                        loadDirectoryContents(parentPath);
                     }, 500);
                 }
             } catch (evalError: any) {
@@ -452,9 +454,11 @@ export default function DevtoolsPage() {
                 });
             } else {
                 setStatus({ message: evalResult.message, type: "success" });
-                // Refresh the tree to show the changes
+                // Refresh only the parent directory to show the changes
+                const pathParts = deletePath.split("/");
+                const parentPath = pathParts.slice(0, -1).join("/");
                 setTimeout(() => {
-                    refreshOpfsContents();
+                    loadDirectoryContents(parentPath);
                 }, 500);
             }
         } catch (evalError: any) {
@@ -484,7 +488,14 @@ export default function DevtoolsPage() {
             });
         };
 
-        setOpfsContents((prevContents) => updateEntry(prevContents));
+        setOpfsContents((prevContents) => {
+            // If path is empty (root), replace the entire contents
+            if (path === "") {
+                return contents;
+            }
+            // Otherwise, update the specific directory
+            return updateEntry(prevContents);
+        });
     };
 
     // --- Listen for browser.runtime messages ---
