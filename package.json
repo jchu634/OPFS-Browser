@@ -1,7 +1,7 @@
 {
   "name": "opfs-browser",
-  "version": "1.4.0",
-  "description": "A simple chrome & firefox extension template with Vite, React, TypeScript and Tailwind CSS.",
+  "version": "1.0.0",
+  "description": "A extension to navigate the OPFS for chrome & firefox.",
   "license": "MIT",
   "repository": {
     "type": "git",
