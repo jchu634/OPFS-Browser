@@ -662,7 +662,7 @@ export default function DevtoolsPage() {
                     <div className="pl-4 flex space-x-2">
                         {entry.kind === "directory" && (
                             <button
-                                className="bg-amber-800 rounded-lg flex p-2 text-white hover:bg-amber-700 transition-colors"
+                                className="bg-amber-800 rounded-lg flex p-2 items-center text-white hover:bg-amber-700 transition-colors"
                                 onClick={handleUploadClick}
                                 title="Upload file to this directory"
                             >
@@ -671,7 +671,7 @@ export default function DevtoolsPage() {
                         )}
                         {entry.kind === "file" && (
                             <button
-                                className="bg-blue-600 rounded-lg flex p-2 text-white hover:bg-blue-500 transition-colors"
+                                className="bg-blue-600 rounded-lg flex p-2 items-center text-white hover:bg-blue-500 transition-colors"
                                 onClick={handleDownloadClick}
                                 title="Download this file"
                             >
@@ -738,7 +738,7 @@ export default function DevtoolsPage() {
             <h2 className="mt-6 text-lg">Contents:</h2>
             <div
                 id="result"
-                className="border border-gray-700 p-2 bg-gray-800 mt-2 font-mono max-h-96 overflow-y-auto"
+                className="border border-gray-700 p-2 bg-gray-800 mt-2 font-mono max-h-140 overflow-y-auto"
             >
                 {opfsContents.length === 0
                     ? 'Click "RESET" to load contents.'
