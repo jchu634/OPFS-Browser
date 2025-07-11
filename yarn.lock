@@ -812,6 +812,11 @@
   resolved "https://registry.npmjs.org/@types/filewriter/-/filewriter-0.0.33.tgz"
   integrity sha512-xFU8ZXTw4gd358lb2jw25nxY9QAgqn2+bKKjKOYfNCzN4DKCFetK7sPtrlpg66Ywe3vWY9FNxprZawAh9wfJ3g==
 
+"@types/firefox-webext-browser@^120.0.4":
+  version "120.0.4"
+  resolved "https://registry.npmjs.org/@types/firefox-webext-browser/-/firefox-webext-browser-120.0.4.tgz"
+  integrity sha512-lBrpf08xhiZBigrtdQfUaqX1UauwZ+skbFiL8u2Tdra/rklkKadYmIzTwkNZSWtuZ7OKpFqbE2HHfDoFqvZf6w==
+
 "@types/har-format@*":
   version "1.2.16"
   resolved "https://registry.npmjs.org/@types/har-format/-/har-format-1.2.16.tgz"
