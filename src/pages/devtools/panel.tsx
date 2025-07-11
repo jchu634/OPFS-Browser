@@ -1,9 +1,28 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { RefreshCcw } from "lucide-react";
+import {
+    RefreshCcw,
+    ChevronRight,
+    ChevronDown,
+    File,
+    Folder,
+    Trash2,
+    ArrowDownToLine,
+    ArrowUpToLine,
+} from "lucide-react";
 import "@assets/styles/tailwind.css";
 
 type StatusType = "success" | "error" | "info";
+
+type EntryInfo = {
+    name: string;
+    kind: "file" | "directory";
+    size?: string;
+    path: string;
+    loaded?: boolean;
+    expanded?: boolean;
+    children?: EntryInfo[];
+};
 
 export default function DevtoolsPage() {
     // State for OPFS contents and UI
@@ -20,7 +39,7 @@ export default function DevtoolsPage() {
         message: "Select a file.",
         type: "info",
     });
-    const [opfsContents, setOpfsContents] = useState<string[]>([]);
+    const [opfsContents, setOpfsContents] = useState<EntryInfo[]>([]);
     const [downloadPath, setDownloadPath] = useState("");
     const [uploadFile, setUploadFile] = useState<File | null>(null);
     const [uploadPath, setUploadPath] = useState("");
@@ -28,105 +47,142 @@ export default function DevtoolsPage() {
     const [deleteRecursive, setDeleteRecursive] = useState(false);
 
     // --- OPFS Listing ---
-    const refreshOpfsContents = async () => {
-        setStatus({ message: "Refreshing OPFS list...", type: "info" });
-        setOpfsContents(["Fetching OPFS contents via eval() to DOM..."]);
+    const loadDirectoryContents = async (path: string = "") => {
+        setStatus({
+            message: `Loading contents of ${path || "root"}...`,
+            type: "info",
+        });
 
-        // Eval() code for DOM
-        const getOpfsContentsAndBridgeToDOM = async () => {
-            const collectedOutput: string[] = [];
-            const listDirectoryContents = async (
-                directoryHandle: any,
-                depth: number
-            ) => {
-                depth = depth || 0;
-                if (!directoryHandle) {
-                    directoryHandle = await (
-                        navigator.storage as any
-                    ).getDirectory();
-                }
-                try {
-                    const entries = await directoryHandle.values();
-                    for await (const entry of entries as any) {
-                        const indentation = "    ".repeat(depth);
-                        if (entry.kind === "directory") {
-                            collectedOutput.push(
-                                `${indentation}📁 ${entry.name}/`
-                            );
-                            await listDirectoryContents(entry, depth + 1);
-                        } else {
-                            let size: string | null = null;
-                            try {
-                                const file = await entry.getFile();
-                                size = (file.size / 1024).toFixed(2) + " KB";
-                            } catch {
-                                size = "N/A";
-                            }
-                            collectedOutput.push(
-                                `${indentation}📄 ${entry.name} (${size})`
-                            );
-                        }
-                    }
-                } catch (error: any) {
-                    collectedOutput.push(
-                        `Error: OPFS listing failed at ${
-                            directoryHandle.name || "root"
-                        }: ${error.message} (${error.name})`
-                    );
-                    throw error;
-                }
-            };
-            let resultStatus: StatusType = "success";
-            let resultMessage = "Successfully retrieved OPFS contents.";
+        const getDirectoryContentsAndBridgeToDOM = async (
+            directoryPath: string
+        ) => {
             try {
-                await listDirectoryContents(null, 0);
+                const parts = directoryPath
+                    .split("/")
+                    .filter((p) => p.length > 0);
+                let currentHandle: any = await (
+                    navigator.storage as any
+                ).getDirectory();
+
+                // Navigate to the target directory
+                for (const part of parts) {
+                    currentHandle = await currentHandle.getDirectoryHandle(
+                        part
+                    );
+                }
+
+                const entries: EntryInfo[] = [];
+                const handleEntries = await currentHandle.values();
+
+                for await (const entry of handleEntries as any) {
+                    const entryPath = directoryPath
+                        ? `${directoryPath}/${entry.name}`
+                        : entry.name;
+
+                    if (entry.kind === "directory") {
+                        entries.push({
+                            name: entry.name,
+                            kind: "directory",
+                            path: entryPath,
+                            loaded: false,
+                            expanded: false,
+                            children: [],
+                        });
+                    } else {
+                        let size: string | undefined = undefined;
+                        try {
+                            const file = await entry.getFile();
+                            size = (file.size / 1024).toFixed(2) + " KB";
+                        } catch {
+                            size = undefined;
+                        }
+                        entries.push({
+                            name: entry.name,
+                            kind: "file",
+                            path: entryPath,
+                            size,
+                        });
+                    }
+                }
+
+                let dataElement = document.getElementById("opfs-debug-data");
+                if (!dataElement) {
+                    dataElement = document.createElement(
+                        "script"
+                    ) as HTMLScriptElement;
+                    dataElement.id = "opfs-debug-data";
+                    (dataElement as HTMLScriptElement).type =
+                        "application/json";
+                    document.head.appendChild(dataElement);
+                }
+                dataElement.textContent = JSON.stringify({
+                    status: "success",
+                    message: "Successfully retrieved directory contents.",
+                    contents: entries,
+                    path: directoryPath,
+                });
+                window.dispatchEvent(new CustomEvent("OPFSDebugDataReady"));
+                return {
+                    status: "success",
+                    message: "Directory contents loaded",
+                    contents: entries,
+                };
             } catch (error: any) {
-                resultStatus = "error";
-                resultMessage = `OPFS access/listing failed: ${error.message}`;
+                let dataElement = document.getElementById("opfs-debug-data");
+                if (!dataElement) {
+                    dataElement = document.createElement(
+                        "script"
+                    ) as HTMLScriptElement;
+                    dataElement.id = "opfs-debug-data";
+                    (dataElement as HTMLScriptElement).type =
+                        "application/json";
+                    document.head.appendChild(dataElement);
+                }
+                dataElement.textContent = JSON.stringify({
+                    status: "error",
+                    message: `Failed to load directory contents: ${error.message}`,
+                    contents: [],
+                    path: directoryPath,
+                });
+                window.dispatchEvent(new CustomEvent("OPFSDebugDataReady"));
+                return {
+                    status: "error",
+                    message: `Failed to load directory contents: ${error.message}`,
+                    contents: [],
+                };
             }
-            let dataElement = document.getElementById("opfs-debug-data");
-            if (!dataElement) {
-                dataElement = document.createElement(
-                    "script"
-                ) as HTMLScriptElement;
-                dataElement.id = "opfs-debug-data";
-                (dataElement as HTMLScriptElement).type = "application/json";
-                document.head.appendChild(dataElement);
-            }
-            dataElement.textContent = JSON.stringify({
-                status: resultStatus,
-                message: resultMessage,
-                contents: collectedOutput,
-            });
-            window.dispatchEvent(new CustomEvent("OPFSDebugDataReady"));
-            return true;
         };
+
         try {
             // @ts-ignore browser global
-            const [evalConfirmation, isException]: [any, boolean] = await (
+            const [evalResult, isException]: [any, boolean] = await (
                 browser as any
             ).devtools.inspectedWindow.eval(
-                `(${getOpfsContentsAndBridgeToDOM.toString()})()`
+                `(${getDirectoryContentsAndBridgeToDOM.toString()})('${path}')`
             );
             if (isException) {
                 setStatus({
                     message:
-                        "Error: Eval failed to bridge data for listing. Check page console.",
+                        "Error: Eval failed to load directory contents. Check page console.",
                     type: "error",
                 });
             } else {
                 setStatus({
                     message:
-                        "Eval initiated for listing. Awaiting content script response...",
+                        "Eval initiated for directory loading. Awaiting content script response...",
                     type: "info",
                 });
             }
         } catch (evalError: any) {
             setStatus({
-                message: `Error initiating eval for listing: ${evalError.message}`,
+                message: `Error initiating eval for directory loading: ${evalError.message}`,
                 type: "error",
             });
         }
+    };
+
+    const refreshOpfsContents = async () => {
+        await loadDirectoryContents("");
     };
 
     // --- Download File ---
@@ -408,6 +464,28 @@ export default function DevtoolsPage() {
         }
     };
 
+    // --- Directory content insertion helper ---
+    const insertDirectoryContents = (path: string, contents: EntryInfo[]) => {
+        const updateEntry = (entries: EntryInfo[]): EntryInfo[] => {
+            return entries.map((entry) => {
+                if (entry.path === path && entry.kind === "directory") {
+                    return {
+                        ...entry,
+                        children: contents,
+                        loaded: true,
+                        expanded: true,
+                    };
+                }
+                if (entry.children) {
+                    return { ...entry, children: updateEntry(entry.children) };
+                }
+                return entry;
+            });
+        };
+
+        setOpfsContents((prevContents) => updateEntry(prevContents));
+    };
+
     // --- Listen for browser.runtime messages ---
     useEffect(() => {
         const runtime = (browser as any)?.runtime;
@@ -436,21 +514,38 @@ export default function DevtoolsPage() {
                 message.tabId === tabId
             ) {
                 const result = message.result;
+                console.log(
+                    "Received OPFS_CONTENTS_RESULT_DOM_BRIDGE:",
+                    result
+                );
                 if (result.status === "success") {
-                    setOpfsContents(
-                        result.contents && result.contents.length > 0
-                            ? result.contents
-                            : ["OPFS is empty for this origin."]
-                    );
+                    if (result.path === "") {
+                        // Root directory load
+                        console.log(
+                            "Loading root directory contents:",
+                            result.contents
+                        );
+                        setOpfsContents(
+                            result.contents && result.contents.length > 0
+                                ? result.contents
+                                : []
+                        );
+                    } else {
+                        // Subdirectory load
+                        console.log(
+                            "Loading subdirectory contents for path:",
+                            result.path,
+                            "contents:",
+                            result.contents
+                        );
+                        insertDirectoryContents(result.path, result.contents);
+                    }
                     setStatus({
                         message: "OPFS list refreshed.",
                         type: "success",
                     });
                     console.log(result.contents);
                 } else {
-                    setOpfsContents([
-                        `Error from inspected page: ${result.message}`,
-                    ]);
                     setStatus({
                         message: `Error refreshing list: ${result.message}`,
                         type: "error",
@@ -468,6 +563,106 @@ export default function DevtoolsPage() {
     useEffect(() => {
         refreshOpfsContents();
     }, []);
+
+    // --- Tree Component ---
+    const toggleDirectory = async (path: string) => {
+        const updateEntry = (entries: EntryInfo[]): EntryInfo[] => {
+            return entries.map((entry) => {
+                if (entry.path === path && entry.kind === "directory") {
+                    if (entry.expanded) {
+                        // Collapse directory
+                        return { ...entry, expanded: false };
+                    } else {
+                        // Expand directory - load contents if not loaded
+                        if (!entry.loaded) {
+                            loadDirectoryContents(path);
+                        }
+                        return { ...entry, expanded: true };
+                    }
+                }
+                if (entry.children) {
+                    return { ...entry, children: updateEntry(entry.children) };
+                }
+                return entry;
+            });
+        };
+
+        setOpfsContents((prevContents) => updateEntry(prevContents));
+    };
+
+    const TreeItem = ({
+        entry,
+        depth = 0,
+    }: {
+        entry: EntryInfo;
+        depth?: number;
+    }) => {
+        const isDirectory = entry.kind === "directory";
+        const hasChildren = entry.children && entry.children.length > 0;
+
+        return (
+            <div style={{ marginLeft: `${depth * 20}px` }}>
+                <div
+                    className={`flex items-center py-1 px-2 hover:bg-gray-800 cursor-pointer ${
+                        isDirectory ? "text-blue-300" : "text-gray-200"
+                    }`}
+                    onClick={() => isDirectory && toggleDirectory(entry.path)}
+                >
+                    {isDirectory && (
+                        <span className="mr-2">
+                            {entry.expanded ? (
+                                <ChevronDown size={16} />
+                            ) : (
+                                <ChevronRight size={16} />
+                            )}
+                        </span>
+                    )}
+                    <span className="mr-2">
+                        {isDirectory ? (
+                            <Folder size={16} />
+                        ) : (
+                            <File size={16} />
+                        )}
+                    </span>
+                    <span className="flex-1">{entry.name}</span>
+                    {entry.size && (
+                        <div>
+                            <span className="text-gray-400 text-sm">
+                                {entry.size}
+                            </span>
+                        </div>
+                    )}
+                    <div className="pl-4 flex space-x-2">
+                        {entry.kind === "directory" && (
+                            <div className=" bg-amber-800 rounded-lg flex p-2 text-white">
+                                <ArrowUpToLine />
+                            </div>
+                        )}
+                        {entry.kind === "file" && (
+                            <div className=" bg-blue-600 rounded-lg flex p-2 text-white">
+                                <ArrowDownToLine />
+                            </div>
+                        )}
+
+                        <div className=" bg-red-800 rounded-lg flex p-2 text-white">
+                            <Trash2 />
+                        </div>
+                    </div>
+                </div>
+                {isDirectory && entry.expanded && hasChildren && (
+                    <div>
+                        {entry.children!.map((child, idx) => (
+                            <TreeItem
+                                key={`${child.path}-${idx}`}
+                                entry={child}
+                                depth={depth + 1}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     // --- UI ---
     return (
@@ -581,8 +776,11 @@ export default function DevtoolsPage() {
             >
                 {opfsContents.length === 0
                     ? 'Click "Refresh Contents" to view.'
-                    : opfsContents.map((line, idx) => (
-                          <div key={idx}>{line}</div>
+                    : opfsContents.map((entry, idx) => (
+                          <TreeItem
+                              key={`${entry.path}-${idx}`}
+                              entry={entry}
+                          />
                       ))}
             </div>
         </div>
