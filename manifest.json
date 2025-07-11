@@ -3,7 +3,8 @@
   "name": "OPFS Browser",
   "description": "See your OPFS file system in the debug tools",
   "icons": {
-    "128": "icon-128.png"
+    "128": "icon-128.png",
+    "32": "icon-32.png"
   },
   "permissions": [
     "activeTab"
@@ -23,7 +24,6 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "contentStyle.css",
         "icon-128.png",
         "icon-32.png",
         "src/pages/devtools/panel.html",

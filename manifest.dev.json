@@ -1,12 +1,12 @@
 {
   "icons": {
-    "128": "public/dev-icon-128.png"
+    "128": "public/dev-icon-128.png",
+    "32": "public/dev-icon-128.png"
   },
   "devtools_page": "src/pages/devtools/index.html",
   "web_accessible_resources": [
     {
       "resources": [
-        "contentStyle.css",
         "dev-icon-128.png",
         "dev-icon-32.png",
         "src/pages/devtools/panel.html",

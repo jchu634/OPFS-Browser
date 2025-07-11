@@ -25,7 +25,7 @@ console.log(
 );
 
 Browser.devtools.panels
-    .create("OPFS Browser", "public/dev-icon-32.png", finalPanelContentPath)
+    .create("OPFS Browser", "public/icon-32.png", finalPanelContentPath)
     // .then((panel) => {
     //     console.log("[DevTools Loader] Panel created successfully.");
     //     // Optional: Add listeners for when the panel is shown/hidden

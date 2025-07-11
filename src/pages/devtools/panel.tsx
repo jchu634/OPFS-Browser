@@ -214,7 +214,7 @@ export default function DevtoolsPage() {
                 const file = await fileHandle.getFile();
                 const arrayBuffer = await file.arrayBuffer();
 
-                // Create a download link instead of using the background script
+                // Create a download link to download
                 const blob = new Blob([arrayBuffer]);
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement("a");
@@ -437,7 +437,6 @@ export default function DevtoolsPage() {
         };
 
         try {
-            // @ts-ignore browser global
             const [evalResult, isException]: [any, boolean] = await (
                 browser as any
             ).devtools.inspectedWindow.eval(
@@ -716,16 +715,17 @@ export default function DevtoolsPage() {
 
     // --- UI ---
     return (
-        <div className="bg-black text-white min-h-screen p-4">
+        <div className="bg-neutral-900 text-white min-h-screen p-4">
             <div
                 id="controls"
                 className="mb-4 pb-2 border-b border-gray-700 flex justify-between"
             >
-                <h1 className="text-amber-800 text-xl font-bold mb-2">
+                <h1 className="text-white text-xl font-bold mb-2">
                     Origin Private File System Browser
                 </h1>
                 <div></div>
-                {/* <div
+                {/* Status Screen, too distracting
+                    <div
                     id="status"
                     className={` p-2 rounded ${
                         status.type === "success"
