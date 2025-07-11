@@ -752,7 +752,7 @@ export default function DevtoolsPage() {
                 className="border border-gray-700 p-2 bg-gray-800 mt-2 font-mono max-h-140 overflow-y-auto"
             >
                 {opfsContents.length === 0
-                    ? 'Click "RESET" to load contents.'
+                    ? 'There are OPFS files detected, Click "RESET" to try detect files.'
                     : opfsContents.map((entry, idx) => (
                           <TreeItem
                               key={`${entry.path}-${idx}`}
