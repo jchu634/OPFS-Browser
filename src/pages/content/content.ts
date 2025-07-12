@@ -1,3 +1,4 @@
+import Browser from "webextension-polyfill";
 console.log("[Content Script] OPFS DOM Bridge content script loaded.");
 
 // --- General OPFS Data Event Listener (for listing and operation status) ---
@@ -17,7 +18,7 @@ window.addEventListener(
                     opfsData.status
                 );
 
-                browser.runtime.sendMessage({
+                Browser.runtime.sendMessage({
                     type: "OPFS_DATA_FROM_CONTENT_SCRIPT",
                     data: opfsData,
                 });

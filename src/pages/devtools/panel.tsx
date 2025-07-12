@@ -1,3 +1,4 @@
+import Browser from "webextension-polyfill";
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -145,7 +146,7 @@ export default function DevtoolsPage() {
         try {
             // @ts-ignore browser global
             const [evalResult, isException]: [any, boolean] = await (
-                browser as any
+                Browser as any
             ).devtools.inspectedWindow.eval(
                 `(${getDirectoryContentsAndBridgeToDOM.toString()})('${path}')`
             );
@@ -241,7 +242,7 @@ export default function DevtoolsPage() {
         try {
             // @ts-ignore browser global
             const [evalResult, isException]: [any, boolean] = await (
-                browser as any
+                Browser as any
             ).devtools.inspectedWindow.eval(
                 `(${downloadFileFromPage.toString()})('${filePath}')`
             );
@@ -343,7 +344,7 @@ export default function DevtoolsPage() {
             try {
                 // @ts-ignore browser global
                 const [evalResult, isException]: [any, boolean] = await (
-                    browser as any
+                    Browser as any
                 ).devtools.inspectedWindow.eval(
                     `(${uploadFileToPage.toString()})('${uploadPath}', '${base64Content}')`
                 );
@@ -459,7 +460,7 @@ export default function DevtoolsPage() {
 
         try {
             const [evalResult, isException]: [any, boolean] = await (
-                browser as any
+                Browser as any
             ).devtools.inspectedWindow.eval(
                 `(${deleteEntryFromPage.toString()})('${deletePath}', ${deleteRecursive})`
             );
@@ -520,10 +521,10 @@ export default function DevtoolsPage() {
 
     // --- Listen for browser.runtime messages ---
     useEffect(() => {
-        const runtime = (browser as any)?.runtime;
+        const runtime = (Browser as any)?.runtime;
         if (!runtime) return;
         const listener = (message: any) => {
-            const tabId = (browser as any).devtools.inspectedWindow.tabId;
+            const tabId = (Browser as any).devtools.inspectedWindow.tabId;
             if (
                 message.type === "OPFS_CONTENTS_RESULT_DOM_BRIDGE" &&
                 message.tabId === tabId
