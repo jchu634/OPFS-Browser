@@ -9,7 +9,7 @@ if (navigator.userAgent.includes("Firefox")) {
     finalPanelContentPath = FIREFOX_PANEL_DIR;
 } else if (
     navigator.userAgent.includes("Chrome") ||
-    navigator.userAgent.includes("Edg")
+    navigator.userAgent.includes("Edge")
 ) {
     finalPanelContentPath = CHROMIUM_PANEL_DIR;
 } else {
@@ -26,13 +26,6 @@ console.log(
 
 Browser.devtools.panels
     .create("OPFS Browser", "public/icon-32.png", finalPanelContentPath)
-    // .then((panel) => {
-    //     console.log("[DevTools Loader] Panel created successfully.");
-    //     // Optional: Add listeners for when the panel is shown/hidden
-    //     panel.onShown.addListener(() => {
-    //       console.log("[DevTools Panel] Panel is now visible!");
-    //     });
-    // })
     .catch((error) => {
         console.error("[DevTools Loader] Error creating panel:", error);
     });
