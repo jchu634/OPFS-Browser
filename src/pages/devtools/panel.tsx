@@ -26,22 +26,10 @@ type EntryInfo = {
 };
 
 export default function DevtoolsPage() {
-    // State for OPFS contents and UI
-    const [status, setStatus] = useState<{ message: string; type: StatusType }>(
-        {
-            message: "Ready.",
-            type: "info",
-        }
-    );
     const [opfsContents, setOpfsContents] = useState<EntryInfo[]>([]);
 
     // --- OPFS Listing ---
     const loadDirectoryContents = async (path: string = "") => {
-        setStatus({
-            message: `Loading contents of ${path || "root"}...`,
-            type: "info",
-        });
-
         const getDirectoryContentsAndBridgeToDOM = async (
             directoryPath: string
         ) => {
@@ -149,24 +137,10 @@ export default function DevtoolsPage() {
             ).devtools.inspectedWindow.eval(
                 `(${getDirectoryContentsAndBridgeToDOM.toString()})('${path}')`
             );
-            if (isException) {
-                setStatus({
-                    message:
-                        "Error: Eval failed to load directory contents. Check page console.",
-                    type: "error",
-                });
-            } else {
-                setStatus({
-                    message:
-                        "Eval initiated for directory loading. Awaiting content script response...",
-                    type: "info",
-                });
-            }
         } catch (evalError: any) {
-            setStatus({
-                message: `Error initiating eval for directory loading: ${evalError.message}`,
-                type: "error",
-            });
+            console.error(
+                `Error initiating eval for directory loading: ${evalError.message}`
+            );
         }
     };
 
@@ -177,16 +151,10 @@ export default function DevtoolsPage() {
     // --- Download File ---
     const handleDownload = async (filePath: string) => {
         if (!filePath.trim()) {
-            setStatus({
-                message: "No file path provided for download.",
-                type: "error",
-            });
+            console.log("No file path provided for download.");
             return;
         }
-        setStatus({
-            message: `Attempting to download '${filePath}'...`,
-            type: "info",
-        });
+        console.log(`Attempting to download '${filePath}'...`);
 
         const downloadFileFromPage = async (path: string) => {
             try {
@@ -245,46 +213,21 @@ export default function DevtoolsPage() {
             ).devtools.inspectedWindow.eval(
                 `(${downloadFileFromPage.toString()})('${filePath}')`
             );
-            if (isException || evalResult.status === "error") {
-                setStatus({
-                    message: `Download failed: ${
-                        isException
-                            ? "Exception in page. See page console."
-                            : evalResult.message
-                    }`,
-                    type: "error",
-                });
-            } else {
-                setStatus({ message: evalResult.message, type: "success" });
-            }
         } catch (evalError: any) {
-            setStatus({
-                message: `Error initiating download: ${evalError.message}`,
-                type: "error",
-            });
+            console.error(`Error initiating download: ${evalError.message}`);
         }
     };
 
     // --- Upload File ---
     const handleUpload = async (file: File, uploadPath: string) => {
         if (!file) {
-            setStatus({
-                message: "No file provided for upload.",
-                type: "error",
-            });
+            console.error("No file provided for upload.");
             return;
         }
         if (!uploadPath.trim()) {
-            setStatus({
-                message: "No upload path provided.",
-                type: "error",
-            });
+            console.error("No upload path provided.");
             return;
         }
-        setStatus({
-            message: `Reading '${file.name}' for upload to '${uploadPath}'...`,
-            type: "info",
-        });
 
         const reader = new FileReader();
         reader.onload = async (e: ProgressEvent<FileReader>) => {
@@ -292,10 +235,7 @@ export default function DevtoolsPage() {
             const base64Content = btoa(
                 String.fromCharCode(...new Uint8Array(fileContentArrayBuffer))
             );
-            setStatus({
-                message: `Uploading '${file.name}' to '${uploadPath}'...`,
-                type: "info",
-            });
+            console.log(`Uploading '${file.name}' to '${uploadPath}'...`);
 
             const uploadFileToPage = async (
                 path: string,
@@ -347,17 +287,7 @@ export default function DevtoolsPage() {
                 ).devtools.inspectedWindow.eval(
                     `(${uploadFileToPage.toString()})('${uploadPath}', '${base64Content}')`
                 );
-                if (isException || evalResult.status === "error") {
-                    setStatus({
-                        message: `Upload failed: ${
-                            isException
-                                ? "Exception in page. See page console."
-                                : evalResult.message
-                        }`,
-                        type: "error",
-                    });
-                } else {
-                    setStatus({ message: evalResult.message, type: "success" });
+                if (!isException && evalResult.status !== "error") {
                     // Refresh only the parent directory to show the new file
                     const pathParts = uploadPath.split("/");
                     const parentPath = pathParts.slice(0, -1).join("/");
@@ -366,18 +296,12 @@ export default function DevtoolsPage() {
                     }, 500);
                 }
             } catch (evalError: any) {
-                setStatus({
-                    message: `Error initiating upload: ${evalError.message}`,
-                    type: "error",
-                });
+                console.error(`Error initiating upload: ${evalError.message}`);
             }
         };
 
         reader.onerror = () => {
-            setStatus({
-                message: `Error reading file for upload: ${reader.error}`,
-                type: "error",
-            });
+            console.error(`Error reading file for upload: ${reader.error}`);
         };
         reader.readAsArrayBuffer(file);
     };
@@ -390,10 +314,9 @@ export default function DevtoolsPage() {
             const file = (event.target as HTMLInputElement).files?.[0];
             if (file) {
                 const uploadPath = file.name; // Root path is just the filename
-                setStatus({
-                    message: `File selected: ${file.name}. Starting upload to root...`,
-                    type: "info",
-                });
+                console.log(
+                    `File selected: ${file.name}. Starting upload to root...`
+                );
                 setTimeout(() => {
                     handleUpload(file, uploadPath);
                 }, 100);
@@ -408,16 +331,12 @@ export default function DevtoolsPage() {
         deleteRecursive: boolean
     ) => {
         if (!deletePath.trim()) {
-            setStatus({
-                message: "No entry path provided for deletion.",
-                type: "error",
-            });
+            console.error("No entry path provided for deletion.");
             return;
         }
-        setStatus({
-            message: `Attempting to delete '${deletePath}' (recursive: ${deleteRecursive})...`,
-            type: "info",
-        });
+        console.log(
+            `Attempting to delete '${deletePath}' (recursive: ${deleteRecursive})...`
+        );
 
         const deleteEntryFromPage = async (
             path: string,
@@ -464,16 +383,15 @@ export default function DevtoolsPage() {
                 `(${deleteEntryFromPage.toString()})('${deletePath}', ${deleteRecursive})`
             );
             if (isException || evalResult.status === "error") {
-                setStatus({
-                    message: `Delete failed: ${
+                console.error(
+                    `Delete failed: ${
                         isException
                             ? "Exception in page. See page console."
                             : evalResult.message
-                    }`,
-                    type: "error",
-                });
+                    }`
+                );
             } else {
-                setStatus({ message: evalResult.message, type: "success" });
+                console.log({ message: evalResult.message, type: "success" });
                 // Refresh only the parent directory to show the changes
                 const pathParts = deletePath.split("/");
                 const parentPath = pathParts.slice(0, -1).join("/");
@@ -482,10 +400,7 @@ export default function DevtoolsPage() {
                 }, 500);
             }
         } catch (evalError: any) {
-            setStatus({
-                message: `Error initiating delete: ${evalError.message}`,
-                type: "error",
-            });
+            console.error(`Error initiating delete: ${evalError.message}`);
         }
     };
 
@@ -555,16 +470,9 @@ export default function DevtoolsPage() {
                         );
                         insertDirectoryContents(result.path, result.contents);
                     }
-                    setStatus({
-                        message: "OPFS list refreshed.",
-                        type: "success",
-                    });
-                    console.log(result.contents);
+                    console.log("OPFS list refreshed.");
                 } else {
-                    setStatus({
-                        message: `Error refreshing list: ${result.message}`,
-                        type: "error",
-                    });
+                    console.error(`Error refreshing list: ${result.message}`);
                 }
             }
         };
@@ -639,10 +547,9 @@ export default function DevtoolsPage() {
                         uploadPath = pathParts.join("/");
                     }
 
-                    setStatus({
-                        message: `File selected: ${file.name}. Starting upload...`,
-                        type: "info",
-                    });
+                    console.log(
+                        `File selected: ${file.name}. Starting upload...`
+                    );
 
                     // Auto-trigger upload
                     setTimeout(() => {
@@ -745,19 +652,6 @@ export default function DevtoolsPage() {
                     Origin Private File System Browser
                 </h1>
                 <div></div>
-                {/* Status Screen, too distracting
-                    <div
-                    id="status"
-                    className={` p-2 rounded ${
-                        status.type === "success"
-                            ? "bg-green-900 text-green-300"
-                            : status.type === "error"
-                            ? "bg-red-900 text-red-300"
-                            : "bg-blue-900 text-blue-300"
-                    }`}
-                >
-                    {status.message}
-                </div> */}
                 <div className="flex space-x-2">
                     <button
                         className="bg-green-700 p-2 rounded flex space-x-2 hover:bg-green-600 transition-colors"
