@@ -4,7 +4,9 @@
 # OPFS-Browser
 
 A Firefox and Chrome extension that can view, and modify the OPFS File System.
-<img src="Screenshot.png" alt="Screenshot of the OPFS-Browser Extension"/>
+[<img src="public/firefox.png" alt="Link to the Firefox extension"/>](https://addons.mozilla.org/en-US/firefox/addon/opfs-browser/)
+<img src="public/Screenshot.png" alt="Screenshot of the OPFS-Browser Extension"/>
+
 
 ## Usage
 When opening the Devtools, there should be a new tab named OFPS Browser.\
