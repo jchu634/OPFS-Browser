@@ -10,6 +10,7 @@ import {
     ArrowDownToLine,
     ArrowUpToLine,
     Upload,
+    BugIcon,
 } from "lucide-react";
 import "@assets/styles/tailwind.css";
 
@@ -27,6 +28,7 @@ type EntryInfo = {
 
 export default function DevtoolsPage() {
     const [opfsContents, setOpfsContents] = useState<EntryInfo[]>([]);
+    const [debugEnabled, setDebugEnabled] = useState<boolean>(false);
 
     // --- OPFS Listing ---
     const loadDirectoryContents = async (path: string = "") => {
@@ -314,9 +316,12 @@ export default function DevtoolsPage() {
             const file = (event.target as HTMLInputElement).files?.[0];
             if (file) {
                 const uploadPath = file.name; // Root path is just the filename
-                console.log(
-                    `File selected: ${file.name}. Starting upload to root...`
-                );
+                if (debugEnabled) {
+                    console.log(
+                        `File selected: ${file.name}. Starting upload to root...`
+                    );
+                }
+
                 setTimeout(() => {
                     handleUpload(file, uploadPath);
                 }, 100);
@@ -334,9 +339,11 @@ export default function DevtoolsPage() {
             console.error("No entry path provided for deletion.");
             return;
         }
-        console.log(
-            `Attempting to delete '${deletePath}' (recursive: ${deleteRecursive})...`
-        );
+        if (debugEnabled) {
+            console.log(
+                `Attempting to delete '${deletePath}' (recursive: ${deleteRecursive})...`
+            );
+        }
 
         const deleteEntryFromPage = async (
             path: string,
@@ -391,7 +398,13 @@ export default function DevtoolsPage() {
                     }`
                 );
             } else {
-                console.log({ message: evalResult.message, type: "success" });
+                if (debugEnabled) {
+                    console.log({
+                        message: evalResult.message,
+                        type: "success",
+                    });
+                }
+
                 // Refresh only the parent directory to show the changes
                 const pathParts = deletePath.split("/");
                 const parentPath = pathParts.slice(0, -1).join("/");
@@ -444,17 +457,23 @@ export default function DevtoolsPage() {
                 message.tabId === tabId
             ) {
                 const result = message.result;
-                console.log(
-                    "Received OPFS_CONTENTS_RESULT_DOM_BRIDGE:",
-                    result
-                );
+                if (debugEnabled) {
+                    console.log(
+                        "Received OPFS_CONTENTS_RESULT_DOM_BRIDGE:",
+                        result
+                    );
+                }
+
                 if (result.status === "success") {
                     if (result.path === "") {
                         // Root directory load
-                        console.log(
-                            "Loading root directory contents:",
-                            result.contents
-                        );
+                        if (debugEnabled) {
+                            console.log(
+                                "Loading root directory contents:",
+                                result.contents
+                            );
+                        }
+
                         setOpfsContents(
                             result.contents && result.contents.length > 0
                                 ? result.contents
@@ -462,15 +481,20 @@ export default function DevtoolsPage() {
                         );
                     } else {
                         // Subdirectory load
-                        console.log(
-                            "Loading subdirectory contents for path:",
-                            result.path,
-                            "contents:",
-                            result.contents
-                        );
+                        if (debugEnabled) {
+                            console.log(
+                                "Loading subdirectory contents for path:",
+                                result.path,
+                                "contents:",
+                                result.contents
+                            );
+                        }
+
                         insertDirectoryContents(result.path, result.contents);
                     }
-                    console.log("OPFS list refreshed.");
+                    if (debugEnabled) {
+                        console.log("OPFS list refreshed.");
+                    }
                 } else {
                     console.error(`Error refreshing list: ${result.message}`);
                 }
@@ -546,10 +570,11 @@ export default function DevtoolsPage() {
                         pathParts[pathParts.length - 1] = file.name;
                         uploadPath = pathParts.join("/");
                     }
-
-                    console.log(
-                        `File selected: ${file.name}. Starting upload...`
-                    );
+                    if (debugEnabled) {
+                        console.log(
+                            `File selected: ${file.name}. Starting upload...`
+                        );
+                    }
 
                     // Auto-trigger upload
                     setTimeout(() => {
@@ -664,12 +689,27 @@ export default function DevtoolsPage() {
                         <Upload />
                     </button>
                     <button
-                        className="bg-amber-700 p-2 rounded flex space-x-2"
+                        className="bg-amber-700 p-2 rounded flex space-x-2 cursor-pointer"
                         onClick={refreshOpfsContents}
                     >
-                        <p className="h-max align-middle font-bold">RESET</p>
+                        <p className="h-max align-middle font-bold">REFRESH</p>
                         <RefreshCcw />
                     </button>
+                    {debugEnabled ? (
+                        <button
+                            className="bg-green-400 p-2 rounded flex space-x-2 text-black"
+                            onClick={() => setDebugEnabled(false)}
+                        >
+                            <BugIcon />
+                        </button>
+                    ) : (
+                        <button
+                            className="bg-red-700 p-2 rounded flex space-x-2"
+                            onClick={() => setDebugEnabled(true)}
+                        >
+                            <BugIcon />
+                        </button>
+                    )}
                 </div>
             </div>
 
