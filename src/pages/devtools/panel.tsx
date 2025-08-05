@@ -10,6 +10,7 @@ import {
     ArrowDownToLine,
     ArrowUpToLine,
     Upload,
+    BugIcon,
 } from "lucide-react";
 import "@assets/styles/tailwind.css";
 
@@ -27,6 +28,9 @@ type EntryInfo = {
 
 export default function DevtoolsPage() {
     const [opfsContents, setOpfsContents] = useState<EntryInfo[]>([]);
+    const [debugEnabled, setDebugEnabled] = useState<boolean>(false);
+    const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+    const [pollingInterval, setPollingInterval] = useState<number>(10);
 
     // --- OPFS Listing ---
     const loadDirectoryContents = async (path: string = "") => {
@@ -314,9 +318,12 @@ export default function DevtoolsPage() {
             const file = (event.target as HTMLInputElement).files?.[0];
             if (file) {
                 const uploadPath = file.name; // Root path is just the filename
-                console.log(
-                    `File selected: ${file.name}. Starting upload to root...`
-                );
+                if (debugEnabled) {
+                    console.log(
+                        `File selected: ${file.name}. Starting upload to root...`
+                    );
+                }
+
                 setTimeout(() => {
                     handleUpload(file, uploadPath);
                 }, 100);
@@ -334,9 +341,11 @@ export default function DevtoolsPage() {
             console.error("No entry path provided for deletion.");
             return;
         }
-        console.log(
-            `Attempting to delete '${deletePath}' (recursive: ${deleteRecursive})...`
-        );
+        if (debugEnabled) {
+            console.log(
+                `Attempting to delete '${deletePath}' (recursive: ${deleteRecursive})...`
+            );
+        }
 
         const deleteEntryFromPage = async (
             path: string,
@@ -391,7 +400,20 @@ export default function DevtoolsPage() {
                     }`
                 );
             } else {
-                console.log({ message: evalResult.message, type: "success" });
+                if (debugEnabled) {
+                    console.log({
+                        message: evalResult.message,
+                        type: "success",
+                    });
+                }
+
+                // Remove the deleted path from expandedPaths
+                setExpandedPaths((prev) => {
+                    const newSet = new Set(prev);
+                    newSet.delete(deletePath);
+                    return newSet;
+                });
+
                 // Refresh only the parent directory to show the changes
                 const pathParts = deletePath.split("/");
                 const parentPath = pathParts.slice(0, -1).join("/");
@@ -409,11 +431,13 @@ export default function DevtoolsPage() {
         const updateEntry = (entries: EntryInfo[]): EntryInfo[] => {
             return entries.map((entry) => {
                 if (entry.path === path && entry.kind === "directory") {
+                    // When inserting contents, also set expanded based on expandedPaths
+                    const isExpanded = expandedPaths.has(entry.path);
                     return {
                         ...entry,
                         children: contents,
                         loaded: true,
-                        expanded: true,
+                        expanded: isExpanded,
                     };
                 }
                 if (entry.children) {
@@ -426,7 +450,12 @@ export default function DevtoolsPage() {
         setOpfsContents((prevContents) => {
             // If path is empty (root), replace the entire contents
             if (path === "") {
-                return contents;
+                // For root, apply expanded state from expandedPaths
+                return contents.map((entry) =>
+                    entry.kind === "directory"
+                        ? { ...entry, expanded: expandedPaths.has(entry.path) }
+                        : entry
+                );
             }
             // Otherwise, update the specific directory
             return updateEntry(prevContents);
@@ -444,33 +473,50 @@ export default function DevtoolsPage() {
                 message.tabId === tabId
             ) {
                 const result = message.result;
-                console.log(
-                    "Received OPFS_CONTENTS_RESULT_DOM_BRIDGE:",
-                    result
-                );
+                if (debugEnabled) {
+                    console.log(
+                        "Received OPFS_CONTENTS_RESULT_DOM_BRIDGE:",
+                        result
+                    );
+                }
+
                 if (result.status === "success") {
                     if (result.path === "") {
                         // Root directory load
-                        console.log(
-                            "Loading root directory contents:",
-                            result.contents
-                        );
+                        if (debugEnabled) {
+                            console.log(
+                                "Loading root directory contents:",
+                                result.contents
+                            );
+                        }
+
+                        // Apply expanded state to root entries
                         setOpfsContents(
                             result.contents && result.contents.length > 0
-                                ? result.contents
+                                ? result.contents.map((entry: EntryInfo) =>
+                                      entry.kind === "directory" &&
+                                      expandedPaths.has(entry.path)
+                                          ? { ...entry, expanded: true }
+                                          : entry
+                                  )
                                 : []
                         );
                     } else {
                         // Subdirectory load
-                        console.log(
-                            "Loading subdirectory contents for path:",
-                            result.path,
-                            "contents:",
-                            result.contents
-                        );
+                        if (debugEnabled) {
+                            console.log(
+                                "Loading subdirectory contents for path:",
+                                result.path,
+                                "contents:",
+                                result.contents
+                            );
+                        }
+
                         insertDirectoryContents(result.path, result.contents);
                     }
-                    console.log("OPFS list refreshed.");
+                    if (debugEnabled) {
+                        console.log("OPFS list refreshed.");
+                    }
                 } else {
                     console.error(`Error refreshing list: ${result.message}`);
                 }
@@ -480,37 +526,98 @@ export default function DevtoolsPage() {
         return () => {
             runtime.onMessage.removeListener(listener);
         };
-    }, []);
+    }, [expandedPaths, debugEnabled]); // Add expandedPaths to dependencies
 
     // Initial refresh on mount
     useEffect(() => {
         refreshOpfsContents();
     }, []);
 
-    // --- Tree Component ---
-    const toggleDirectory = async (path: string) => {
-        const updateEntry = (entries: EntryInfo[]): EntryInfo[] => {
-            return entries.map((entry) => {
-                if (entry.path === path && entry.kind === "directory") {
-                    if (entry.expanded) {
-                        // Collapse directory
-                        return { ...entry, expanded: false };
-                    } else {
-                        // Expand directory - load contents if not loaded
-                        if (!entry.loaded) {
-                            loadDirectoryContents(path);
-                        }
-                        return { ...entry, expanded: true };
+    // Effect to reload expanded directories when opfsContents changes
+    useEffect(() => {
+        // It checks if any of the currently expanded paths are not yet 'loaded'
+        // and triggers a load for them. This helps re-expand folders after a full refresh.
+        const directoriesToLoad = Array.from(expandedPaths).filter((path) => {
+            // Find the corresponding entry in opfsContents
+            // This is a simplified search; a more robust solution might traverse the tree.
+            let found = false;
+            const findAndCheck = (entries: EntryInfo[]): boolean => {
+                for (const entry of entries) {
+                    if (entry.path === path && entry.kind === "directory") {
+                        found = true;
+                        return !entry.loaded;
+                    }
+                    if (entry.children && findAndCheck(entry.children)) {
+                        return true;
                     }
                 }
-                if (entry.children) {
-                    return { ...entry, children: updateEntry(entry.children) };
-                }
-                return entry;
-            });
-        };
+                return false;
+            };
+            return findAndCheck(opfsContents);
+        });
 
-        setOpfsContents((prevContents) => updateEntry(prevContents));
+        directoriesToLoad.forEach((path) => {
+            loadDirectoryContents(path);
+        });
+    }, [opfsContents, expandedPaths]); // Depend on opfsContents and expandedPaths
+
+    // --- Polling page for changes ---
+    useEffect(() => {
+        let intervalId: NodeJS.Timeout | null = null;
+
+        if (pollingInterval > 0) {
+            // Set up interval only if pollingInterval is greater than 0
+            intervalId = setInterval(() => {
+                console.log(
+                    `Polling OPFS contents (interval: ${pollingInterval}s)...`
+                );
+                refreshOpfsContents();
+            }, pollingInterval * 1000); // Convert seconds to milliseconds
+        }
+
+        // Cleanup function
+        return () => {
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+        };
+    }, [pollingInterval]);
+
+    // --- Tree Component ---
+    const toggleDirectory = async (path: string) => {
+        setOpfsContents((prevContents) => {
+            const updateEntry = (entries: EntryInfo[]): EntryInfo[] => {
+                return entries.map((entry) => {
+                    if (entry.path === path && entry.kind === "directory") {
+                        const newExpandedState = !entry.expanded;
+                        // Update expandedPaths set
+                        setExpandedPaths((prev) => {
+                            const newSet = new Set(prev);
+                            if (newExpandedState) {
+                                newSet.add(path);
+                            } else {
+                                newSet.delete(path);
+                            }
+                            return newSet;
+                        });
+
+                        if (newExpandedState && !entry.loaded) {
+                            // If expanding and not loaded, trigger content load
+                            loadDirectoryContents(path);
+                        }
+                        return { ...entry, expanded: newExpandedState };
+                    }
+                    if (entry.children) {
+                        return {
+                            ...entry,
+                            children: updateEntry(entry.children),
+                        };
+                    }
+                    return entry;
+                });
+            };
+            return updateEntry(prevContents);
+        });
     };
 
     const TreeItem = ({
@@ -546,10 +653,11 @@ export default function DevtoolsPage() {
                         pathParts[pathParts.length - 1] = file.name;
                         uploadPath = pathParts.join("/");
                     }
-
-                    console.log(
-                        `File selected: ${file.name}. Starting upload...`
-                    );
+                    if (debugEnabled) {
+                        console.log(
+                            `File selected: ${file.name}. Starting upload...`
+                        );
+                    }
 
                     // Auto-trigger upload
                     setTimeout(() => {
@@ -646,40 +754,80 @@ export default function DevtoolsPage() {
         <div className="bg-neutral-900 text-white min-h-screen p-4">
             <div
                 id="controls"
-                className="mb-4 pb-2 border-b border-gray-700 flex justify-between"
+                className="mb-4 pb-2 border-b border-gray-700 flex flex-col sm:flex-row justify-between sm:items-center"
             >
-                <h1 className="text-white text-xl font-bold mb-2">
+                <h1 className="text-white text-xl font-bold mb-2 sm:mb-0">
                     Origin Private File System Browser
                 </h1>
-                <div></div>
-                <div className="flex space-x-2">
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 items-end sm:items-center">
+                    <div className="flex items-center space-x-2">
+                        <label
+                            htmlFor="pollingInterval"
+                            className="text-gray-300 text-sm"
+                        >
+                            Polling Interval (Seconds):
+                        </label>
+                        <input
+                            id="pollingInterval"
+                            type="number"
+                            min="0"
+                            value={pollingInterval}
+                            onChange={(e) =>
+                                setPollingInterval(parseInt(e.target.value))
+                            }
+                            className="bg-gray-700 text-white border border-gray-600 rounded px-2 py-1 w-20 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            title="Set the auto-refresh interval in seconds (0 to disable)"
+                        />
+                    </div>
+
                     <button
-                        className="bg-green-700 p-2 rounded flex space-x-2 hover:bg-green-600 transition-colors"
-                        onClick={handleUploadToRoot}
-                        title="Upload file to root directory"
-                    >
-                        <p className="h-max align-middle font-bold">
-                            UPLOAD TO ROOT
-                        </p>
-                        <Upload />
-                    </button>
-                    <button
-                        className="bg-amber-700 p-2 rounded flex space-x-2"
+                        className="bg-amber-700 p-2 rounded flex space-x-2 cursor-pointer hover:bg-amber-600 transition-colors"
                         onClick={refreshOpfsContents}
+                        title="Manually refresh the file system view"
                     >
-                        <p className="h-max align-middle font-bold">RESET</p>
+                        <p className="h-max align-middle font-bold">REFRESH</p>
                         <RefreshCcw />
                     </button>
+                    {debugEnabled ? (
+                        <button
+                            className="bg-green-400 p-2 rounded flex space-x-2 text-black hover:bg-green-300 transition-colors"
+                            onClick={() => setDebugEnabled(false)}
+                            title="Disable debug mode"
+                        >
+                            <BugIcon />
+                        </button>
+                    ) : (
+                        <button
+                            className="bg-red-700 p-2 rounded flex space-x-2 hover:bg-red-600 transition-colors"
+                            onClick={() => setDebugEnabled(true)}
+                            title="Enable debug mode"
+                        >
+                            <BugIcon />
+                        </button>
+                    )}
                 </div>
             </div>
 
-            <h2 className="mt-6 text-lg">Contents:</h2>
+            <div className="mb-4 pb-2 border-b border-gray-700 flex flex-col sm:flex-row justify-between sm:items-center">
+                <h2 className="mt-6 text-lg">Contents:</h2>
+                <button
+                    className="bg-green-700 p-2 rounded flex space-x-2 hover:bg-green-600 transition-colors"
+                    onClick={handleUploadToRoot}
+                    title="Upload file to root directory"
+                >
+                    <p className="h-max align-middle font-bold">
+                        UPLOAD TO ROOT
+                    </p>
+                    <Upload />
+                </button>
+            </div>
+
             <div
                 id="result"
                 className="border border-gray-700 p-2 bg-gray-800 mt-2 font-mono max-h-140 overflow-y-auto"
             >
                 {opfsContents.length === 0
-                    ? 'There are OPFS files detected, Click "RESET" to try detect files.'
+                    ? 'There are no OPFS files detected. Click "REFRESH" to try detect files.'
                     : opfsContents.map((entry, idx) => (
                           <TreeItem
                               key={`${entry.path}-${idx}`}
