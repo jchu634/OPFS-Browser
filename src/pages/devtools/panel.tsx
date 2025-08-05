@@ -29,6 +29,7 @@ type EntryInfo = {
 export default function DevtoolsPage() {
     const [opfsContents, setOpfsContents] = useState<EntryInfo[]>([]);
     const [debugEnabled, setDebugEnabled] = useState<boolean>(false);
+    const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
 
     // --- OPFS Listing ---
     const loadDirectoryContents = async (path: string = "") => {
@@ -405,6 +406,13 @@ export default function DevtoolsPage() {
                     });
                 }
 
+                // Remove the deleted path from expandedPaths
+                setExpandedPaths((prev) => {
+                    const newSet = new Set(prev);
+                    newSet.delete(deletePath);
+                    return newSet;
+                });
+
                 // Refresh only the parent directory to show the changes
                 const pathParts = deletePath.split("/");
                 const parentPath = pathParts.slice(0, -1).join("/");
@@ -422,11 +430,13 @@ export default function DevtoolsPage() {
         const updateEntry = (entries: EntryInfo[]): EntryInfo[] => {
             return entries.map((entry) => {
                 if (entry.path === path && entry.kind === "directory") {
+                    // When inserting contents, also set expanded based on expandedPaths
+                    const isExpanded = expandedPaths.has(entry.path);
                     return {
                         ...entry,
                         children: contents,
                         loaded: true,
-                        expanded: true,
+                        expanded: isExpanded,
                     };
                 }
                 if (entry.children) {
@@ -439,7 +449,12 @@ export default function DevtoolsPage() {
         setOpfsContents((prevContents) => {
             // If path is empty (root), replace the entire contents
             if (path === "") {
-                return contents;
+                // For root, apply expanded state from expandedPaths
+                return contents.map((entry) =>
+                    entry.kind === "directory"
+                        ? { ...entry, expanded: expandedPaths.has(entry.path) }
+                        : entry
+                );
             }
             // Otherwise, update the specific directory
             return updateEntry(prevContents);
@@ -474,9 +489,15 @@ export default function DevtoolsPage() {
                             );
                         }
 
+                        // Apply expanded state to root entries
                         setOpfsContents(
                             result.contents && result.contents.length > 0
-                                ? result.contents
+                                ? result.contents.map((entry: EntryInfo) =>
+                                      entry.kind === "directory" &&
+                                      expandedPaths.has(entry.path)
+                                          ? { ...entry, expanded: true }
+                                          : entry
+                                  )
                                 : []
                         );
                     } else {
@@ -504,37 +525,76 @@ export default function DevtoolsPage() {
         return () => {
             runtime.onMessage.removeListener(listener);
         };
-    }, []);
+    }, [expandedPaths, debugEnabled]); // Add expandedPaths to dependencies
 
     // Initial refresh on mount
     useEffect(() => {
         refreshOpfsContents();
     }, []);
 
-    // --- Tree Component ---
-    const toggleDirectory = async (path: string) => {
-        const updateEntry = (entries: EntryInfo[]): EntryInfo[] => {
-            return entries.map((entry) => {
-                if (entry.path === path && entry.kind === "directory") {
-                    if (entry.expanded) {
-                        // Collapse directory
-                        return { ...entry, expanded: false };
-                    } else {
-                        // Expand directory - load contents if not loaded
-                        if (!entry.loaded) {
-                            loadDirectoryContents(path);
-                        }
-                        return { ...entry, expanded: true };
+    // Effect to reload expanded directories when opfsContents changes
+    useEffect(() => {
+        // It checks if any of the currently expanded paths are not yet 'loaded'
+        // and triggers a load for them. This helps re-expand folders after a full refresh.
+        const directoriesToLoad = Array.from(expandedPaths).filter((path) => {
+            // Find the corresponding entry in opfsContents
+            // This is a simplified search; a more robust solution might traverse the tree.
+            let found = false;
+            const findAndCheck = (entries: EntryInfo[]): boolean => {
+                for (const entry of entries) {
+                    if (entry.path === path && entry.kind === "directory") {
+                        found = true;
+                        return !entry.loaded;
+                    }
+                    if (entry.children && findAndCheck(entry.children)) {
+                        return true;
                     }
                 }
-                if (entry.children) {
-                    return { ...entry, children: updateEntry(entry.children) };
-                }
-                return entry;
-            });
-        };
+                return false;
+            };
+            return findAndCheck(opfsContents);
+        });
 
-        setOpfsContents((prevContents) => updateEntry(prevContents));
+        directoriesToLoad.forEach((path) => {
+            loadDirectoryContents(path);
+        });
+    }, [opfsContents, expandedPaths]); // Depend on opfsContents and expandedPaths
+
+    // --- Tree Component ---
+    const toggleDirectory = async (path: string) => {
+        setOpfsContents((prevContents) => {
+            const updateEntry = (entries: EntryInfo[]): EntryInfo[] => {
+                return entries.map((entry) => {
+                    if (entry.path === path && entry.kind === "directory") {
+                        const newExpandedState = !entry.expanded;
+                        // Update expandedPaths set
+                        setExpandedPaths((prev) => {
+                            const newSet = new Set(prev);
+                            if (newExpandedState) {
+                                newSet.add(path);
+                            } else {
+                                newSet.delete(path);
+                            }
+                            return newSet;
+                        });
+
+                        if (newExpandedState && !entry.loaded) {
+                            // If expanding and not loaded, trigger content load
+                            loadDirectoryContents(path);
+                        }
+                        return { ...entry, expanded: newExpandedState };
+                    }
+                    if (entry.children) {
+                        return {
+                            ...entry,
+                            children: updateEntry(entry.children),
+                        };
+                    }
+                    return entry;
+                });
+            };
+            return updateEntry(prevContents);
+        });
     };
 
     const TreeItem = ({
@@ -719,7 +779,7 @@ export default function DevtoolsPage() {
                 className="border border-gray-700 p-2 bg-gray-800 mt-2 font-mono max-h-140 overflow-y-auto"
             >
                 {opfsContents.length === 0
-                    ? 'There are OPFS files detected, Click "RESET" to try detect files.'
+                    ? 'There are no OPFS files detected. Click "REFRESH" to try detect files.'
                     : opfsContents.map((entry, idx) => (
                           <TreeItem
                               key={`${entry.path}-${idx}`}
