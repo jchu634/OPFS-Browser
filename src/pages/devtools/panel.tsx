@@ -765,7 +765,7 @@ export default function DevtoolsPage() {
                             htmlFor="pollingInterval"
                             className="text-gray-300 text-sm"
                         >
-                            Polling Interval (s):
+                            Polling Interval (Seconds):
                         </label>
                         <input
                             id="pollingInterval"
