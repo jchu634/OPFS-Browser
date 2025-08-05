@@ -30,6 +30,7 @@ export default function DevtoolsPage() {
     const [opfsContents, setOpfsContents] = useState<EntryInfo[]>([]);
     const [debugEnabled, setDebugEnabled] = useState<boolean>(false);
     const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+    const [pollingInterval, setPollingInterval] = useState<number>(10);
 
     // --- OPFS Listing ---
     const loadDirectoryContents = async (path: string = "") => {
@@ -560,6 +561,28 @@ export default function DevtoolsPage() {
         });
     }, [opfsContents, expandedPaths]); // Depend on opfsContents and expandedPaths
 
+    // --- Polling page for changes ---
+    useEffect(() => {
+        let intervalId: NodeJS.Timeout | null = null;
+
+        if (pollingInterval > 0) {
+            // Set up interval only if pollingInterval is greater than 0
+            intervalId = setInterval(() => {
+                console.log(
+                    `Polling OPFS contents (interval: ${pollingInterval}s)...`
+                );
+                refreshOpfsContents();
+            }, pollingInterval * 1000); // Convert seconds to milliseconds
+        }
+
+        // Cleanup function
+        return () => {
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+        };
+    }, [pollingInterval]);
+
     // --- Tree Component ---
     const toggleDirectory = async (path: string) => {
         setOpfsContents((prevContents) => {
@@ -731,41 +754,53 @@ export default function DevtoolsPage() {
         <div className="bg-neutral-900 text-white min-h-screen p-4">
             <div
                 id="controls"
-                className="mb-4 pb-2 border-b border-gray-700 flex justify-between"
+                className="mb-4 pb-2 border-b border-gray-700 flex flex-col sm:flex-row justify-between sm:items-center"
             >
-                <h1 className="text-white text-xl font-bold mb-2">
+                <h1 className="text-white text-xl font-bold mb-2 sm:mb-0">
                     Origin Private File System Browser
                 </h1>
-                <div></div>
-                <div className="flex space-x-2">
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 items-end sm:items-center">
+                    <div className="flex items-center space-x-2">
+                        <label
+                            htmlFor="pollingInterval"
+                            className="text-gray-300 text-sm"
+                        >
+                            Polling Interval (s):
+                        </label>
+                        <input
+                            id="pollingInterval"
+                            type="number"
+                            min="0"
+                            value={pollingInterval}
+                            onChange={(e) =>
+                                setPollingInterval(parseInt(e.target.value))
+                            }
+                            className="bg-gray-700 text-white border border-gray-600 rounded px-2 py-1 w-20 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            title="Set the auto-refresh interval in seconds (0 to disable)"
+                        />
+                    </div>
+
                     <button
-                        className="bg-green-700 p-2 rounded flex space-x-2 hover:bg-green-600 transition-colors"
-                        onClick={handleUploadToRoot}
-                        title="Upload file to root directory"
-                    >
-                        <p className="h-max align-middle font-bold">
-                            UPLOAD TO ROOT
-                        </p>
-                        <Upload />
-                    </button>
-                    <button
-                        className="bg-amber-700 p-2 rounded flex space-x-2 cursor-pointer"
+                        className="bg-amber-700 p-2 rounded flex space-x-2 cursor-pointer hover:bg-amber-600 transition-colors"
                         onClick={refreshOpfsContents}
+                        title="Manually refresh the file system view"
                     >
                         <p className="h-max align-middle font-bold">REFRESH</p>
                         <RefreshCcw />
                     </button>
                     {debugEnabled ? (
                         <button
-                            className="bg-green-400 p-2 rounded flex space-x-2 text-black"
+                            className="bg-green-400 p-2 rounded flex space-x-2 text-black hover:bg-green-300 transition-colors"
                             onClick={() => setDebugEnabled(false)}
+                            title="Disable debug mode"
                         >
                             <BugIcon />
                         </button>
                     ) : (
                         <button
-                            className="bg-red-700 p-2 rounded flex space-x-2"
+                            className="bg-red-700 p-2 rounded flex space-x-2 hover:bg-red-600 transition-colors"
                             onClick={() => setDebugEnabled(true)}
+                            title="Enable debug mode"
                         >
                             <BugIcon />
                         </button>
@@ -773,7 +808,20 @@ export default function DevtoolsPage() {
                 </div>
             </div>
 
-            <h2 className="mt-6 text-lg">Contents:</h2>
+            <div className="mb-4 pb-2 border-b border-gray-700 flex flex-col sm:flex-row justify-between sm:items-center">
+                <h2 className="mt-6 text-lg">Contents:</h2>
+                <button
+                    className="bg-green-700 p-2 rounded flex space-x-2 hover:bg-green-600 transition-colors"
+                    onClick={handleUploadToRoot}
+                    title="Upload file to root directory"
+                >
+                    <p className="h-max align-middle font-bold">
+                        UPLOAD TO ROOT
+                    </p>
+                    <Upload />
+                </button>
+            </div>
+
             <div
                 id="result"
                 className="border border-gray-700 p-2 bg-gray-800 mt-2 font-mono max-h-140 overflow-y-auto"
