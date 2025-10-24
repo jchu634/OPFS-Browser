@@ -235,16 +235,28 @@ export default function DevtoolsPage() {
 
         const reader = new FileReader();
         reader.onload = async (e: ProgressEvent<FileReader>) => {
+            function byteArrayToBase64(xs: Uint8Array): string {
+                if ('toBase64' in xs) {
+                    return (xs as any).toBase64();
+                }
+                return btoa(Array.from(xs).map(x => String.fromCharCode(x)).join(''));
+            }
+
             const fileContentArrayBuffer = e.target?.result as ArrayBuffer;
-            const base64Content = btoa(
-                String.fromCharCode(...new Uint8Array(fileContentArrayBuffer))
-            );
+            const base64Content = byteArrayToBase64(new Uint8Array(fileContentArrayBuffer));
             console.log(`Uploading '${file.name}' to '${uploadPath}'...`);
 
             const uploadFileToPage = async (
                 path: string,
                 contentBase64: string
             ) => {
+                function base64ToByteArray(s: string): Uint8Array<ArrayBuffer> {
+                    if ('fromBase64' in Uint8Array) {
+                        return (Uint8Array as any).fromBase64(s);
+                    }
+                    return new Uint8Array(atob(s).split('').map(x => x.charCodeAt(0)));
+                }
+
                 try {
                     const parts = path.split("/");
                     let currentHandle: any = await (
@@ -263,12 +275,7 @@ export default function DevtoolsPage() {
                         { create: true }
                     );
                     const writable = await fileHandle.createWritable();
-                    const byteCharacters = atob(contentBase64);
-                    const byteNumbers = new Array(byteCharacters.length);
-                    for (let i = 0; i < byteCharacters.length; i++) {
-                        byteNumbers[i] = byteCharacters.charCodeAt(i);
-                    }
-                    const byteArray = new Uint8Array(byteNumbers);
+                    const byteArray = base64ToByteArray(contentBase64);
                     const blob = new Blob([byteArray]);
                     await writable.write(blob);
                     await writable.close();
