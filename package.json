@@ -1,6 +1,6 @@
 {
   "name": "opfs-browser",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A extension to navigate the OPFS for chrome & firefox.",
   "license": "MIT",
   "repository": {
